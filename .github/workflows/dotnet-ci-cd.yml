@@ -119,6 +119,7 @@ jobs:
         uses: source-generator/actions/publish-nuget@main
         with:
           dotnet-version: ${{ inputs.dotnet-version }}
+          # Use publish-project-path if specified, otherwise fall back to project-path
           project-path: ${{ inputs.publish-project-path != '' && inputs.publish-project-path || inputs.project-path }}
           configuration: ${{ inputs.configuration }}
           package-version: ${{ inputs.package-version }}
