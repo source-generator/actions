@@ -45,6 +45,75 @@ runs:
       with:
         dotnet-version: ${{ inputs.dotnet-version }}
 
+    - name: Validate NuGet metadata
+      shell: bash
+      run: |
+        PROJECT_FILE="${{ inputs.project-path }}"
+        ERRORS=()
+
+        check_property() {
+          local prop="$1"
+          if ! grep -qiE "<${prop}[^>]*>[^<[:space:]]" "$PROJECT_FILE"; then
+            ERRORS+=("  - Missing required NuGet property: <${prop}>")
+          fi
+        }
+
+        check_property "PackageId"
+        check_property "Authors"
+        check_property "Description"
+        check_property "PackageProjectUrl"
+        check_property "RepositoryUrl"
+        check_property "PackageTags"
+        check_property "PackageReadmeFile"
+        check_property "Copyright"
+
+        # Version: accept Version, PackageVersion, or VersionPrefix
+        if ! grep -qiE "<(Version|PackageVersion|VersionPrefix)[^>]*>[^<[:space:]]" "$PROJECT_FILE"; then
+          ERRORS+=("  - Missing required NuGet property: <Version>, <PackageVersion>, or <VersionPrefix>")
+        fi
+
+        # License: accept PackageLicenseExpression or PackageLicenseFile
+        if ! grep -qiE "<(PackageLicenseExpression|PackageLicenseFile)[^>]*>[^<[:space:]]" "$PROJECT_FILE"; then
+          ERRORS+=("  - Missing required NuGet property: <PackageLicenseExpression> or <PackageLicenseFile>")
+        fi
+
+        # Validate that the README file referenced by PackageReadmeFile actually exists
+        README_FILE=$(sed -n 's/.*<PackageReadmeFile[^>]*>\(.*\)<\/PackageReadmeFile>.*/\1/Ip' "$PROJECT_FILE" | head -1 | tr -d '[:space:]')
+        if [ -n "$README_FILE" ]; then
+          PROJECT_DIR=$(dirname "$PROJECT_FILE")
+          if [ ! -f "${PROJECT_DIR}/${README_FILE}" ] && [ ! -f "${README_FILE}" ]; then
+            ERRORS+=("  - PackageReadmeFile references '${README_FILE}' but the file does not exist relative to the project directory")
+          fi
+        fi
+
+        if [ ${#ERRORS[@]} -gt 0 ]; then
+          echo "::error::NuGet metadata validation failed for '${PROJECT_FILE}'. Please add the missing properties to a <PropertyGroup> in your project file:"
+          for error in "${ERRORS[@]}"; do
+            echo "::error::${error}"
+          done
+          echo ""
+          echo "Example <PropertyGroup> with all required NuGet metadata:"
+          echo "  <PropertyGroup>"
+          echo "    <PackageId>Your.Package.Id</PackageId>"
+          echo "    <Version>1.0.0</Version>"
+          echo "    <Authors>Your Name</Authors>"
+          echo "    <Description>A short description of what the package does.</Description>"
+          echo "    <Copyright>Copyright (c) $(date +%Y) Your Name</Copyright>"
+          echo "    <PackageLicenseExpression>MIT</PackageLicenseExpression>"
+          echo "    <PackageProjectUrl>https://github.com/your/repo</PackageProjectUrl>"
+          echo "    <RepositoryUrl>https://github.com/your/repo</RepositoryUrl>"
+          echo "    <PackageTags>tag1;tag2;tag3</PackageTags>"
+          echo "    <PackageReadmeFile>README.md</PackageReadmeFile>"
+          echo "  </PropertyGroup>"
+          echo "  <!-- Also include the README in the package: -->"
+          echo "  <ItemGroup>"
+          echo "    <None Include=\"README.md\" Pack=\"true\" PackagePath=\"\\\" />"
+          echo "  </ItemGroup>"
+          exit 1
+        fi
+
+        echo "✅ NuGet metadata validation passed."
+
     - name: Pack
       shell: bash
       run: >-
