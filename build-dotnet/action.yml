@@ -1,0 +1,40 @@
+name: "Build .NET Project"
+description: "Sets up .NET SDK and builds a .NET project or solution"
+
+inputs:
+  dotnet-version:
+    description: "The .NET SDK version to install (e.g. '10.0.x', '9.0.x')"
+    required: false
+    default: "10.0.x"
+  project-path:
+    description: "Path to the project or solution file to build"
+    required: false
+    default: ""
+  configuration:
+    description: "Build configuration (e.g. Debug, Release)"
+    required: false
+    default: "Release"
+  extra-args:
+    description: "Additional arguments to pass to dotnet build"
+    required: false
+    default: ""
+
+runs:
+  using: "composite"
+  steps:
+    - name: Setup .NET SDK
+      uses: actions/setup-dotnet@v4
+      with:
+        dotnet-version: ${{ inputs.dotnet-version }}
+
+    - name: Restore dependencies
+      shell: bash
+      run: dotnet restore ${{ inputs.project-path }}
+
+    - name: Build
+      shell: bash
+      run: >-
+        dotnet build ${{ inputs.project-path }}
+        --configuration ${{ inputs.configuration }}
+        --no-restore
+        ${{ inputs.extra-args }}

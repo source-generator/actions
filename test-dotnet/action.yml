@@ -1,0 +1,176 @@
+name: "Test .NET Project"
+description: "Runs tests for a .NET project or solution and optionally uploads results"
+
+inputs:
+  dotnet-version:
+    description: "The .NET SDK version to install (e.g. '10.0.x', '9.0.x')"
+    required: false
+    default: "10.0.x"
+  project-path:
+    description: "Path to the test project or solution file"
+    required: false
+    default: ""
+  configuration:
+    description: "Build configuration (e.g. Debug, Release)"
+    required: false
+    default: "Release"
+  collect-coverage:
+    description: "Whether to collect code coverage (true/false)"
+    required: false
+    default: "true"
+  results-directory:
+    description: "Directory to store test results"
+    required: false
+    default: "TestResults"
+  coverage-threshold:
+    description: "Minimum required line coverage percentage (0 to disable threshold check)"
+    required: false
+    default: "80"
+  include-unreferenced-projects:
+    description: "Whether to count projects not referenced by any test project as uncovered (true/false)"
+    required: false
+    default: "true"
+  extra-args:
+    description: "Additional arguments to pass to dotnet test"
+    required: false
+    default: ""
+
+runs:
+  using: "composite"
+  steps:
+    - name: Setup .NET SDK
+      uses: actions/setup-dotnet@v4
+      with:
+        dotnet-version: ${{ inputs.dotnet-version }}
+
+    - name: Run tests
+      shell: bash
+      run: >-
+        dotnet test ${{ inputs.project-path }}
+        --configuration ${{ inputs.configuration }}
+        --logger "trx;LogFileName=test-results.trx"
+        --results-directory ${{ inputs.results-directory }}
+        ${{ inputs.collect-coverage == 'true' && '--collect:"XPlat Code Coverage"' || '' }}
+        ${{ inputs.extra-args }}
+
+    - name: Upload test results
+      if: always()
+      uses: actions/upload-artifact@v4
+      with:
+        name: test-results
+        path: ${{ inputs.results-directory }}
+        retention-days: 14
+
+    - name: Install ReportGenerator
+      if: ${{ inputs.collect-coverage == 'true' && inputs.coverage-threshold != '0' }}
+      shell: bash
+      run: dotnet tool install --global dotnet-reportgenerator-globaltool
+
+    - name: Enforce coverage threshold
+      if: ${{ inputs.collect-coverage == 'true' && inputs.coverage-threshold != '0' }}
+      shell: bash
+      run: |
+        # Find all coverage files
+        COVERAGE_FILES=$(find "${{ inputs.results-directory }}" -name "coverage.cobertura.xml" | tr '\n' ';')
+
+        if [ -z "$COVERAGE_FILES" ]; then
+          echo "::warning::No coverage files found. Skipping coverage check."
+          exit 0
+        fi
+
+        # Generate merged Cobertura report
+        reportgenerator \
+          -reports:"$COVERAGE_FILES" \
+          -targetdir:"${{ inputs.results-directory }}/coverage-report" \
+          -reporttypes:"Cobertura;TextSummary"
+
+        MERGED_REPORT="${{ inputs.results-directory }}/coverage-report/Cobertura.xml"
+
+        if [ ! -f "$MERGED_REPORT" ]; then
+          echo "::error::Failed to generate merged coverage report"
+          exit 1
+        fi
+
+        # Display text summary
+        cat "${{ inputs.results-directory }}/coverage-report/Summary.txt"
+
+        # Extract line-rate from the merged Cobertura report (root <coverage> element)
+        COVERED_LINES=$(sed -n 's/.*lines-covered="\([0-9]*\)".*/\1/p' "$MERGED_REPORT" | head -1)
+        TOTAL_LINES=$(sed -n 's/.*lines-valid="\([0-9]*\)".*/\1/p' "$MERGED_REPORT" | head -1)
+
+        COVERED_LINES=${COVERED_LINES:-0}
+        TOTAL_LINES=${TOTAL_LINES:-0}
+
+        # Include unreferenced projects if enabled
+        if [ "${{ inputs.include-unreferenced-projects }}" == "true" ]; then
+          echo ""
+          echo "Scanning for projects not referenced by any test project..."
+
+          # Get assembly names present in coverage report
+          COVERED_ASSEMBLIES=$(sed -n 's/.*<package name="\([^"]*\)".*/\1/p' "$MERGED_REPORT" | sort -u)
+
+          UNREFERENCED_COUNT=0
+          UNREFERENCED_LINES=0
+
+          while IFS= read -r PROJECT; do
+            [ -z "$PROJECT" ] && continue
+
+            # Skip test projects (check for common test SDK/framework references)
+            if grep -qiE '<IsTestProject>true</IsTestProject>|Microsoft\.NET\.Test\.Sdk|xunit|nunit|mstest' "$PROJECT" 2>/dev/null; then
+              continue
+            fi
+
+            # Get assembly name: prefer explicit <AssemblyName>, fall back to filename
+            ASSEMBLY_NAME=$(sed -n 's/.*<AssemblyName>\(.*\)<\/AssemblyName>.*/\1/p' "$PROJECT" 2>/dev/null | head -1)
+            if [ -z "$ASSEMBLY_NAME" ]; then
+              ASSEMBLY_NAME=$(basename "$PROJECT" .csproj)
+            fi
+
+            # Check if this assembly appears in coverage data
+            if ! echo "$COVERED_ASSEMBLIES" | grep -qF "$ASSEMBLY_NAME"; then
+              # Count C# lines in the project directory (excluding generated code)
+              PROJECT_DIR=$(dirname "$PROJECT")
+              CS_LINES=$(find "$PROJECT_DIR" -name "*.cs" \
+                -not -path "*/bin/*" -not -path "*/obj/*" -not -path "*/Migrations/*" \
+                -exec cat {} + 2>/dev/null | wc -l)
+
+              if [ "$CS_LINES" -gt 0 ]; then
+                echo "::warning::Project '${PROJECT}' (assembly: ${ASSEMBLY_NAME}) is not referenced by any test project — ${CS_LINES} lines counted as uncovered"
+                UNREFERENCED_COUNT=$((UNREFERENCED_COUNT + 1))
+                UNREFERENCED_LINES=$((UNREFERENCED_LINES + CS_LINES))
+              fi
+            fi
+          done < <(find . -name "*.csproj" -not -path "*/bin/*" -not -path "*/obj/*" | sort)
+
+          if [ "$UNREFERENCED_COUNT" -gt 0 ]; then
+            echo ""
+            echo "Found ${UNREFERENCED_COUNT} unreferenced project(s) with ~${UNREFERENCED_LINES} lines of code counted as uncovered"
+            TOTAL_LINES=$((TOTAL_LINES + UNREFERENCED_LINES))
+          fi
+        fi
+
+        # Calculate coverage percentage
+        if [ "$TOTAL_LINES" -eq 0 ]; then
+          echo "::warning::No lines of code found for coverage calculation"
+          exit 0
+        fi
+
+        COVERAGE=$(awk "BEGIN { printf \"%.2f\", ($COVERED_LINES / $TOTAL_LINES) * 100 }")
+        THRESHOLD=${{ inputs.coverage-threshold }}
+
+        echo ""
+        echo "## Code Coverage Summary" >> "$GITHUB_STEP_SUMMARY"
+        echo "- **Line coverage**: ${COVERAGE}% (${COVERED_LINES}/${TOTAL_LINES} lines)" >> "$GITHUB_STEP_SUMMARY"
+        echo "- **Threshold**: ${THRESHOLD}%" >> "$GITHUB_STEP_SUMMARY"
+
+        # Compare coverage to threshold
+        PASS=$(awk "BEGIN { print ($COVERAGE >= $THRESHOLD) ? 1 : 0 }")
+
+        if [ "$PASS" -eq 1 ]; then
+          echo "✅ Coverage ${COVERAGE}% meets the threshold of ${THRESHOLD}%"
+          echo "- **Status**: ✅ Pass" >> "$GITHUB_STEP_SUMMARY"
+        else
+          echo "::error::Coverage ${COVERAGE}% is below the required threshold of ${THRESHOLD}%"
+          echo "- **Status**: ❌ Fail" >> "$GITHUB_STEP_SUMMARY"
+          exit 1
+        fi

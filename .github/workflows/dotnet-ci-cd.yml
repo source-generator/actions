@@ -1,0 +1,141 @@
+name: .NET CI/CD
+
+on:
+  workflow_call:
+    inputs:
+      dotnet-version:
+        description: "The .NET SDK version to install (e.g. '10.0.x', '9.0.x')"
+        required: false
+        type: string
+        default: "10.0.x"
+      project-path:
+        description: "Path to the project or solution file for build and test"
+        required: false
+        type: string
+        default: ""
+      publish-project-path:
+        description: "Path to the project file to pack and publish as a NuGet package"
+        required: false
+        type: string
+        default: ""
+      configuration:
+        description: "Build configuration (e.g. Debug, Release)"
+        required: false
+        type: string
+        default: "Release"
+      runs-on:
+        description: "The runner to use (e.g. ubuntu-latest, windows-latest)"
+        required: false
+        type: string
+        default: "ubuntu-latest"
+      collect-coverage:
+        description: "Whether to collect code coverage"
+        required: false
+        type: boolean
+        default: true
+      coverage-threshold:
+        description: "Minimum required line coverage percentage (0 to disable)"
+        required: false
+        type: number
+        default: 80
+      include-unreferenced-projects:
+        description: "Whether to count projects not referenced by any test project as uncovered"
+        required: false
+        type: boolean
+        default: true
+      package-version:
+        description: "Version for the NuGet package. If empty, uses the version from the project file."
+        required: false
+        type: string
+        default: ""
+      nuget-source:
+        description: "NuGet feed URL to publish to"
+        required: false
+        type: string
+        default: "https://api.nuget.org/v3/index.json"
+      publish:
+        description: "Whether to publish NuGet packages (true/false)"
+        required: false
+        type: boolean
+        default: false
+      skip-duplicate:
+        description: "Skip publishing if the package version already exists"
+        required: false
+        type: boolean
+        default: true
+      build-extra-args:
+        description: "Additional arguments to pass to dotnet build"
+        required: false
+        type: string
+        default: ""
+      test-extra-args:
+        description: "Additional arguments to pass to dotnet test"
+        required: false
+        type: string
+        default: ""
+      extra-pack-args:
+        description: "Additional arguments to pass to dotnet pack"
+        required: false
+        type: string
+        default: ""
+    secrets:
+      nuget-api-key:
+        description: "API key for the NuGet feed (required when publish is true)"
+        required: false
+
+jobs:
+  build:
+    name: Build
+    runs-on: ${{ inputs.runs-on }}
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Build
+        uses: source-generator/actions/build-dotnet@main
+        with:
+          dotnet-version: ${{ inputs.dotnet-version }}
+          project-path: ${{ inputs.project-path }}
+          configuration: ${{ inputs.configuration }}
+          extra-args: ${{ inputs.build-extra-args }}
+
+  test:
+    name: Test
+    runs-on: ${{ inputs.runs-on }}
+    needs: build
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Test
+        uses: source-generator/actions/test-dotnet@main
+        with:
+          dotnet-version: ${{ inputs.dotnet-version }}
+          project-path: ${{ inputs.project-path }}
+          configuration: ${{ inputs.configuration }}
+          collect-coverage: ${{ inputs.collect-coverage && 'true' || 'false' }}
+          coverage-threshold: ${{ inputs.coverage-threshold }}
+          include-unreferenced-projects: ${{ inputs.include-unreferenced-projects && 'true' || 'false' }}
+          extra-args: ${{ inputs.test-extra-args }}
+
+  publish:
+    name: Pack & Publish
+    runs-on: ${{ inputs.runs-on }}
+    needs: test
+    if: ${{ inputs.publish }}
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Publish NuGet Package
+        uses: source-generator/actions/publish-nuget@main
+        with:
+          dotnet-version: ${{ inputs.dotnet-version }}
+          # Use publish-project-path if specified, otherwise fall back to project-path
+          project-path: ${{ inputs.publish-project-path != '' && inputs.publish-project-path || inputs.project-path }}
+          configuration: ${{ inputs.configuration }}
+          package-version: ${{ inputs.package-version }}
+          nuget-source: ${{ inputs.nuget-source }}
+          nuget-api-key: ${{ secrets.nuget-api-key }}
+          skip-duplicate: ${{ inputs.skip-duplicate && 'true' || 'false' }}
+          extra-pack-args: ${{ inputs.extra-pack-args }}

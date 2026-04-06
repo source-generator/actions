@@ -1,0 +1,68 @@
+name: Publish NuGet Package
+
+on:
+  workflow_call:
+    inputs:
+      dotnet-version:
+        description: "The .NET SDK version to install (e.g. '10.0.x', '9.0.x')"
+        required: false
+        type: string
+        default: "10.0.x"
+      project-path:
+        description: "Path to the project file to pack and publish"
+        required: true
+        type: string
+      configuration:
+        description: "Build configuration (e.g. Debug, Release)"
+        required: false
+        type: string
+        default: "Release"
+      package-version:
+        description: "Version for the NuGet package. If empty, uses the version from the project file."
+        required: false
+        type: string
+        default: ""
+      nuget-source:
+        description: "NuGet feed URL to publish to"
+        required: false
+        type: string
+        default: "https://api.nuget.org/v3/index.json"
+      runs-on:
+        description: "The runner to use (e.g. ubuntu-latest, windows-latest)"
+        required: false
+        type: string
+        default: "ubuntu-latest"
+      skip-duplicate:
+        description: "Skip publishing if the package version already exists"
+        required: false
+        type: boolean
+        default: true
+      extra-pack-args:
+        description: "Additional arguments to pass to dotnet pack"
+        required: false
+        type: string
+        default: ""
+    secrets:
+      nuget-api-key:
+        description: "API key for the NuGet feed"
+        required: true
+
+jobs:
+  publish:
+    name: Pack & Publish
+    runs-on: ${{ inputs.runs-on }}
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Publish NuGet Package
+        uses: source-generator/actions/publish-nuget@main
+        with:
+          dotnet-version: ${{ inputs.dotnet-version }}
+          project-path: ${{ inputs.project-path }}
+          configuration: ${{ inputs.configuration }}
+          package-version: ${{ inputs.package-version }}
+          nuget-source: ${{ inputs.nuget-source }}
+          nuget-api-key: ${{ secrets.nuget-api-key }}
+          skip-duplicate: ${{ inputs.skip-duplicate && 'true' || 'false' }}
+          extra-pack-args: ${{ inputs.extra-pack-args }}
