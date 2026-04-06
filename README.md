@@ -11,7 +11,7 @@ Sets up .NET SDK and builds a .NET project or solution.
 ```yaml
 - uses: source-generator/actions/build-dotnet@main
   with:
-    dotnet-version: "8.0.x"   # Optional, default: 8.0.x
+    dotnet-version: "10.0.x"   # Optional, default: 10.0.x
     project-path: "src/MyApp"  # Optional, default: solution root
     configuration: "Release"   # Optional, default: Release
     extra-args: ""             # Optional extra dotnet build args
@@ -24,7 +24,7 @@ Runs tests and uploads results as artifacts.
 ```yaml
 - uses: source-generator/actions/test-dotnet@main
   with:
-    dotnet-version: "8.0.x"      # Optional, default: 8.0.x
+    dotnet-version: "10.0.x"      # Optional, default: 10.0.x
     project-path: "tests/MyApp"  # Optional, default: solution root
     configuration: "Release"     # Optional, default: Release
     collect-coverage: "true"     # Optional, default: true
@@ -41,7 +41,7 @@ Packs and publishes a .NET project as a NuGet package.
   with:
     project-path: "src/MyLib"         # Required
     nuget-api-key: ${{ secrets.NUGET_API_KEY }}  # Required
-    dotnet-version: "8.0.x"           # Optional, default: 8.0.x
+    dotnet-version: "10.0.x"           # Optional, default: 10.0.x
     configuration: "Release"          # Optional, default: Release
     package-version: "1.0.0"          # Optional, uses project version if empty
     nuget-source: "https://api.nuget.org/v3/index.json"  # Optional
@@ -70,7 +70,7 @@ jobs:
   build-and-test:
     uses: source-generator/actions/.github/workflows/dotnet-build-test.yml@main
     with:
-      dotnet-version: "8.0.x"
+      dotnet-version: "10.0.x"
       project-path: "src/MyApp.sln"
       configuration: "Release"
       collect-coverage: true
@@ -118,7 +118,7 @@ jobs:
   ci-cd:
     uses: source-generator/actions/.github/workflows/dotnet-ci-cd.yml@main
     with:
-      dotnet-version: "8.0.x"
+      dotnet-version: "10.0.x"
       project-path: "src/MyApp.sln"
       publish-project-path: "src/MyLib/MyLib.csproj"
       publish: ${{ github.event_name == 'release' }}

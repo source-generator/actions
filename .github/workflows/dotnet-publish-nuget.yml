@@ -4,10 +4,10 @@ on:
   workflow_call:
     inputs:
       dotnet-version:
-        description: "The .NET SDK version to install (e.g. '8.0.x', '9.0.x')"
+        description: "The .NET SDK version to install (e.g. '10.0.x', '9.0.x')"
         required: false
         type: string
-        default: "8.0.x"
+        default: "10.0.x"
       project-path:
         description: "Path to the project file to pack and publish"
         required: true

@@ -3,9 +3,9 @@ description: "Runs tests for a .NET project or solution and optionally uploads r
 
 inputs:
   dotnet-version:
-    description: "The .NET SDK version to install (e.g. '8.0.x', '9.0.x')"
+    description: "The .NET SDK version to install (e.g. '10.0.x', '9.0.x')"
     required: false
-    default: "8.0.x"
+    default: "10.0.x"
   project-path:
     description: "Path to the test project or solution file"
     required: false

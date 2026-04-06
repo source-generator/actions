@@ -3,9 +3,9 @@ description: "Sets up .NET SDK and builds a .NET project or solution"
 
 inputs:
   dotnet-version:
-    description: "The .NET SDK version to install (e.g. '8.0.x', '9.0.x')"
+    description: "The .NET SDK version to install (e.g. '10.0.x', '9.0.x')"
     required: false
-    default: "8.0.x"
+    default: "10.0.x"
   project-path:
     description: "Path to the project or solution file to build"
     required: false
