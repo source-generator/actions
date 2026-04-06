@@ -53,7 +53,7 @@ runs:
 
         check_property() {
           local prop="$1"
-          if ! grep -qiE "<${prop}[^>]*>[^<[:space:]]" "$PROJECT_FILE"; then
+          if ! grep -qE "<${prop}[^>]*>[^<[:space:]]" "$PROJECT_FILE"; then
             ERRORS+=("  - Missing required NuGet property: <${prop}>")
           fi
         }
@@ -68,17 +68,17 @@ runs:
         check_property "Copyright"
 
         # Version: accept Version, PackageVersion, or VersionPrefix
-        if ! grep -qiE "<(Version|PackageVersion|VersionPrefix)[^>]*>[^<[:space:]]" "$PROJECT_FILE"; then
+        if ! grep -qE "<(Version|PackageVersion|VersionPrefix)[^>]*>[^<[:space:]]" "$PROJECT_FILE"; then
           ERRORS+=("  - Missing required NuGet property: <Version>, <PackageVersion>, or <VersionPrefix>")
         fi
 
         # License: accept PackageLicenseExpression or PackageLicenseFile
-        if ! grep -qiE "<(PackageLicenseExpression|PackageLicenseFile)[^>]*>[^<[:space:]]" "$PROJECT_FILE"; then
+        if ! grep -qE "<(PackageLicenseExpression|PackageLicenseFile)[^>]*>[^<[:space:]]" "$PROJECT_FILE"; then
           ERRORS+=("  - Missing required NuGet property: <PackageLicenseExpression> or <PackageLicenseFile>")
         fi
 
         # Validate that the README file referenced by PackageReadmeFile actually exists
-        README_FILE=$(sed -n 's/.*<PackageReadmeFile[^>]*>\(.*\)<\/PackageReadmeFile>.*/\1/Ip' "$PROJECT_FILE" | head -1 | tr -d '[:space:]')
+        README_FILE=$(sed -n 's/.*<PackageReadmeFile[^>]*>\(.*\)<\/PackageReadmeFile>.*/\1/p' "$PROJECT_FILE" | head -1 | sed 's/^[[:space:]]*//;s/[[:space:]]*$//')
         if [ -n "$README_FILE" ]; then
           PROJECT_DIR=$(dirname "$PROJECT_FILE")
           if [ ! -f "${PROJECT_DIR}/${README_FILE}" ] && [ ! -f "${README_FILE}" ]; then
