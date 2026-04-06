@@ -28,6 +28,8 @@ Runs tests and uploads results as artifacts.
     project-path: "tests/MyApp"  # Optional, default: solution root
     configuration: "Release"     # Optional, default: Release
     collect-coverage: "true"     # Optional, default: true
+    coverage-threshold: "80"     # Optional, minimum line coverage % (0 to disable)
+    include-unreferenced-projects: "true"  # Optional, count untested projects as uncovered
     results-directory: "TestResults"  # Optional
     extra-args: ""               # Optional extra dotnet test args
 ```
@@ -136,6 +138,8 @@ jobs:
 | `configuration` | ✅ | ✅ | ✅ | ✅ | Build configuration |
 | `runs-on` | — | — | ✅ | ✅ | Runner to use |
 | `collect-coverage` | — | ✅ | — | ✅ | Collect code coverage |
+| `coverage-threshold` | — | ✅ | — | ✅ | Minimum line coverage % (default: 80, 0 to disable) |
+| `include-unreferenced-projects` | — | ✅ | — | ✅ | Count untested projects as uncovered |
 | `package-version` | — | — | ✅ | ✅ | NuGet package version |
 | `nuget-source` | — | — | ✅ | ✅ | NuGet feed URL |
 | `nuget-api-key` | — | — | ✅ | ✅ | NuGet API key (secret) |

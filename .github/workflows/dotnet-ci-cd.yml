@@ -33,6 +33,16 @@ on:
         required: false
         type: boolean
         default: true
+      coverage-threshold:
+        description: "Minimum required line coverage percentage (0 to disable)"
+        required: false
+        type: number
+        default: 80
+      include-unreferenced-projects:
+        description: "Whether to count projects not referenced by any test project as uncovered"
+        required: false
+        type: boolean
+        default: true
       package-version:
         description: "Version for the NuGet package. If empty, uses the version from the project file."
         required: false
@@ -104,6 +114,8 @@ jobs:
           project-path: ${{ inputs.project-path }}
           configuration: ${{ inputs.configuration }}
           collect-coverage: ${{ inputs.collect-coverage && 'true' || 'false' }}
+          coverage-threshold: ${{ inputs.coverage-threshold }}
+          include-unreferenced-projects: ${{ inputs.include-unreferenced-projects && 'true' || 'false' }}
           extra-args: ${{ inputs.test-extra-args }}
 
   publish:
