@@ -1,0 +1,73 @@
+name: .NET Build and Test
+
+on:
+  workflow_call:
+    inputs:
+      dotnet-version:
+        description: "The .NET SDK version to install (e.g. '8.0.x', '9.0.x')"
+        required: false
+        type: string
+        default: "8.0.x"
+      project-path:
+        description: "Path to the project or solution file"
+        required: false
+        type: string
+        default: ""
+      configuration:
+        description: "Build configuration (e.g. Debug, Release)"
+        required: false
+        type: string
+        default: "Release"
+      runs-on:
+        description: "The runner to use (e.g. ubuntu-latest, windows-latest)"
+        required: false
+        type: string
+        default: "ubuntu-latest"
+      collect-coverage:
+        description: "Whether to collect code coverage"
+        required: false
+        type: boolean
+        default: true
+      test-extra-args:
+        description: "Additional arguments to pass to dotnet test"
+        required: false
+        type: string
+        default: ""
+      build-extra-args:
+        description: "Additional arguments to pass to dotnet build"
+        required: false
+        type: string
+        default: ""
+
+jobs:
+  build:
+    name: Build
+    runs-on: ${{ inputs.runs-on }}
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Build
+        uses: source-generator/actions/build-dotnet@main
+        with:
+          dotnet-version: ${{ inputs.dotnet-version }}
+          project-path: ${{ inputs.project-path }}
+          configuration: ${{ inputs.configuration }}
+          extra-args: ${{ inputs.build-extra-args }}
+
+  test:
+    name: Test
+    runs-on: ${{ inputs.runs-on }}
+    needs: build
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Test
+        uses: source-generator/actions/test-dotnet@main
+        with:
+          dotnet-version: ${{ inputs.dotnet-version }}
+          project-path: ${{ inputs.project-path }}
+          configuration: ${{ inputs.configuration }}
+          collect-coverage: ${{ inputs.collect-coverage && 'true' || 'false' }}
+          extra-args: ${{ inputs.test-extra-args }}

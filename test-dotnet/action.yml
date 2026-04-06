@@ -1,0 +1,54 @@
+name: "Test .NET Project"
+description: "Runs tests for a .NET project or solution and optionally uploads results"
+
+inputs:
+  dotnet-version:
+    description: "The .NET SDK version to install (e.g. '8.0.x', '9.0.x')"
+    required: false
+    default: "8.0.x"
+  project-path:
+    description: "Path to the test project or solution file"
+    required: false
+    default: ""
+  configuration:
+    description: "Build configuration (e.g. Debug, Release)"
+    required: false
+    default: "Release"
+  collect-coverage:
+    description: "Whether to collect code coverage (true/false)"
+    required: false
+    default: "true"
+  results-directory:
+    description: "Directory to store test results"
+    required: false
+    default: "TestResults"
+  extra-args:
+    description: "Additional arguments to pass to dotnet test"
+    required: false
+    default: ""
+
+runs:
+  using: "composite"
+  steps:
+    - name: Setup .NET SDK
+      uses: actions/setup-dotnet@v4
+      with:
+        dotnet-version: ${{ inputs.dotnet-version }}
+
+    - name: Run tests
+      shell: bash
+      run: >-
+        dotnet test ${{ inputs.project-path }}
+        --configuration ${{ inputs.configuration }}
+        --logger "trx;LogFileName=test-results.trx"
+        --results-directory ${{ inputs.results-directory }}
+        ${{ inputs.collect-coverage == 'true' && '--collect:"XPlat Code Coverage"' || '' }}
+        ${{ inputs.extra-args }}
+
+    - name: Upload test results
+      if: always()
+      uses: actions/upload-artifact@v4
+      with:
+        name: test-results
+        path: ${{ inputs.results-directory }}
+        retention-days: 14

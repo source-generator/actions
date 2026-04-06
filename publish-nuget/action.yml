@@ -1,0 +1,70 @@
+name: "Publish NuGet Package"
+description: "Packs and publishes a .NET project as a NuGet package"
+
+inputs:
+  dotnet-version:
+    description: "The .NET SDK version to install (e.g. '8.0.x', '9.0.x')"
+    required: false
+    default: "8.0.x"
+  project-path:
+    description: "Path to the project file to pack and publish"
+    required: true
+  configuration:
+    description: "Build configuration (e.g. Debug, Release)"
+    required: false
+    default: "Release"
+  package-version:
+    description: "Version for the NuGet package. If empty, uses the version from the project file."
+    required: false
+    default: ""
+  nuget-source:
+    description: "NuGet feed URL to publish to"
+    required: false
+    default: "https://api.nuget.org/v3/index.json"
+  nuget-api-key:
+    description: "API key for the NuGet feed"
+    required: true
+  output-directory:
+    description: "Directory to place the packed .nupkg files"
+    required: false
+    default: "nupkg"
+  extra-pack-args:
+    description: "Additional arguments to pass to dotnet pack"
+    required: false
+    default: ""
+  skip-duplicate:
+    description: "Skip publishing if the package version already exists (true/false)"
+    required: false
+    default: "true"
+
+runs:
+  using: "composite"
+  steps:
+    - name: Setup .NET SDK
+      uses: actions/setup-dotnet@v4
+      with:
+        dotnet-version: ${{ inputs.dotnet-version }}
+
+    - name: Pack
+      shell: bash
+      run: >-
+        dotnet pack ${{ inputs.project-path }}
+        --configuration ${{ inputs.configuration }}
+        --output ${{ inputs.output-directory }}
+        ${{ inputs.package-version != '' && format('/p:PackageVersion={0}', inputs.package-version) || '' }}
+        ${{ inputs.extra-pack-args }}
+
+    - name: Publish to NuGet
+      shell: bash
+      run: >-
+        dotnet nuget push "${{ inputs.output-directory }}/*.nupkg"
+        --source ${{ inputs.nuget-source }}
+        --api-key ${{ inputs.nuget-api-key }}
+        ${{ inputs.skip-duplicate == 'true' && '--skip-duplicate' || '' }}
+
+    - name: Upload NuGet package artifact
+      uses: actions/upload-artifact@v4
+      with:
+        name: nuget-packages
+        path: ${{ inputs.output-directory }}/*.nupkg
+        retention-days: 30
